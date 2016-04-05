@@ -1,0 +1,125 @@
+<?php
+ini_set('include_path',dirname(__FILE__).'/lib/'.':'.dirname(__FILE__).'/inc/'.':'.ini_get('include_path'));
+
+/* set the cache expire to 30 minutes */
+session_cache_expire(720);//minutes 
+$cache_expire = session_cache_expire();
+session_start();
+
+$page_load_start_time = microtime(true);
+
+$dir = dirname(__FILE__);
+
+
+mb_language("uni");
+mb_language("Japanese");
+mb_internal_encoding("UTF-8");
+
+include_once 'TestFlg.php';
+require_once 'Zend/Config.php';
+require_once 'Zend/Db.php';
+require_once 'ConnectDB.php';
+require_once 'SQL.php';
+
+if($GLOBALS['settings']['test_flg'] == TRUE){
+    ini_set( 'display_errors', 1 );
+}
+
+$mode = '';
+if(isset($_GET['mode']) && $_GET['mode'] != ''){
+    $mode = 'pc';
+}
+require_once 'Setting.php';
+$conf = Setting::getSetting('conf',$mode); //設定系データ取得
+
+$SmartyDir = 'html/';
+if(isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on'){
+	$SmartyDir = 'secure/';
+}
+
+$path = parse_url(isset($_SERVER['REQUEST_URI'])?$_SERVER['REQUEST_URI']:'');
+if(isset($path['path']) && $path['path'] != ''){
+	$SmartyDir .= substr($path['path'],1);
+}
+
+$conf['smarty'] = array(
+						'tpl'=>$dir.'/tpl/',
+						'tmp'=>$dir.'/tmp/'.$SmartyDir,
+						'cache'=>$dir.'/cache/'.$SmartyDir,
+					);
+
+
+//smartyテンプレートディレクトリ設定
+$conf['template'] = array(
+	'templateDir' => $dir.'/tpl',
+	'compiledTemplateDir' => $dir.'/tmp',
+	'chacheDir' => $dir.'/chache',
+);
+
+$config = new Zend_Config($conf);
+
+$lib = new ConnectDB($config);
+
+//Smarty読み込み
+require_once 'CustomSmarty.php';
+$tmp = array_values( array_diff( explode('/', isset($_SERVER['REQUEST_URI'])?$_SERVER['REQUEST_URI']:''), array( "" ) ) );
+
+$smarty = new Smarty;
+$smarty->template_dir = $lib->getConfig()->smarty->tpl;
+$smarty->compile_dir = $lib->getConfig()->smarty->tmp;
+$smarty->default_modifiers = array('escape:"html"');
+$smarty->default_modifiers = array('default:""');
+
+$lib->dirExistChk($lib->getConfig()->smarty->tmp);
+
+//$smarty = new RCBookingEngineSmarty($SmartyDir);
+//$smarty->addDefaultModifiers('escape:"html"');
+//$smarty->addDefaultModifiers('default:""');
+
+$file_unique = $config->file_unique;
+
+$smarty->assign('test_flg',$config->testflg);
+$smarty->assign('url_top',$config->url->top);
+$smarty->assign('url_sec',$config->url->sec);
+$smarty->assign('sp_flg',$config->sp_flg);
+$smarty->assign('mode_flg',$config->mode_flg);
+$smarty->assign('file_name',$config->file_exten);
+$smarty->assign('file_unique',$config->file_unique);
+
+require_once 'Items.php';
+require_once 'Mail.php';
+
+//施設管理画面
+require_once 'Common.php';
+$Common = new Common($config);
+
+$smarty->assign('title',Common::setMenuTitle($config->file_unique));
+
+//proxy更新時間に合わせて取得できないするために使う
+$smarty->assign('proxy_time',date("Gi"));
+
+$smarty->assign('now',date("Y/m/d H:i"));
+$now_date = date("Y-m-d");
+$smarty->assign('now_date',$now_date);
+
+//本日の定期取得
+$month_week = 4;//1ヵ月を4週目だと考える
+$nth_week = Items::getDate2NthWeek(new DateTime()) % $month_week;
+$nth_week = $nth_week == 0?$month_week:$nth_week;
+$week = date('w');
+
+$smarty->assign('month_week',$month_week);
+$smarty->assign('nth_week',$nth_week);
+$smarty->assign('week',$week);
+$smarty->assign('week_item',Items::getWeek());
+$smarty->assign('nth_week_item',Items::getNthWeek());
+
+function e($param,$flg = ''){
+	if($flg == ''){
+		echo "<pre>";var_dump($param);echo "<pre>";
+	}else{
+		echo "<!-- <pre>";var_dump($param);echo "<pre> -->";
+	}
+	
+}
+

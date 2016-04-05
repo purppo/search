@@ -1,0 +1,6 @@
+{
+    "autoload": {
+        "psr-0": {"search\\": "inc/search"},
+        "files": ["common.php"]
+    }
+}

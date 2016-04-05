@@ -1,0 +1,6 @@
+*~
+tmp/*
+csv/*
+composer.phar
+vendor/*
+tests/_output/*
